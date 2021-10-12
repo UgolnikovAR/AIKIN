@@ -14,6 +14,7 @@ private:
     QTextEdit*  m_ptxt;
     QPushButton* m_psentTxtFileButton;
     QPushButton* m_psentDllFileButton;
+    QPushButton* m_pdropAllConnectionsButton;
 
     using messagesize_t = quint32;
     messagesize_t     m_nNextBlockSize;
@@ -29,6 +30,7 @@ public:
 private slots:
     void slotSendTxtFileToClient();
     void slotSendDllFileToClient();
+    void slotdropAllConnections();
 
 public slots:
     virtual void slotNewConnection();

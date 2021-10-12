@@ -7,7 +7,7 @@ int main(int argc, char *argv[])
 
     TServer server(2323);
     server.move(1920-400, 0);
-    server.resize(400, 1070);
+    server.resize(400, 1050);
     server.show();
 
     return a.exec();

@@ -41,12 +41,22 @@ TServer::TServer(int nPort, QWidget* pwgt /*= 0*/)
             this,      SLOT(slotSendDllFileToClient())
             );
 
+
+    //Кнопка отправки текстового файла
+    m_pdropAllConnectionsButton = new QPushButton(this);
+    m_pdropAllConnectionsButton->setText("&Drop connections");
+
+    connect(m_pdropAllConnectionsButton, SIGNAL(clicked()),
+            this,      SLOT(slotdropAllConnections())
+            );
+
     //сетап лейаута
     QVBoxLayout* pvbxLayout = new QVBoxLayout;
     pvbxLayout->addWidget(new QLabel("<H1>Server</H1>"));
     pvbxLayout->addWidget(m_ptxt);
     pvbxLayout->addWidget(m_psentTxtFileButton);
     pvbxLayout->addWidget(m_psentDllFileButton);
+    pvbxLayout->addWidget(m_pdropAllConnectionsButton);
     setLayout(pvbxLayout);
 }
 
@@ -129,7 +139,6 @@ void TServer::slotSendTxtFileToClient()
     //---------------------------------
 
     quint16 message_t = 2; //2 - "txt file in buffer" type
-    m_ptxt->append("*click*");
 
     QByteArray buff;
     QDataStream out(&buff, QIODevice::WriteOnly);
@@ -145,13 +154,6 @@ void TServer::slotSendTxtFileToClient()
     //Читаем его целиком в буфер
     quint32 fsize = lib.size();
     out << messagesize_t{0} << message_t << lib.readAll();
-
-    //дебаг размера буфера------------
-    std::string str123 = std::to_string(fsize);
-    QString dbgsize = QString::fromStdString(str123);
-    dbgsize = QString("DBG size = ") + dbgsize;
-    m_ptxt->append(dbgsize);
-    //--------------------------------
 
     //Освобождаем файл
     lib.close();
@@ -174,7 +176,6 @@ void TServer::slotSendDllFileToClient()
     //---------------------------------
 
     quint16 message_t = 3; //3 - "dll file in buffer" type
-    m_ptxt->append("*click*");
 
     QByteArray buff;
     QDataStream out(&buff, QIODevice::WriteOnly);
@@ -191,19 +192,12 @@ void TServer::slotSendDllFileToClient()
     quint32 fsize = lib.size();
     out << messagesize_t{0} << message_t << fsize << lib.readAll();
 
-    /*дебаг размера буфера------------  //olds
-    std::string str123 = std::to_string(fsize);
-    QString dbgsize = QString::fromStdString(str123);
-    dbgsize = QString("DBG sending file.. Size = ") + dbgsize;
-    m_ptxt->append(dbgsize);
-    */ //olds
-
     //Освобождаем файл
     lib.close();
 
     //Находим и перезаписываем размер буфера
     out.device()->seek(0);
-    //auto DBG_MessageSize = messagesize_t(buff.size() - sizeof(messagesize_t)); //olds
+
     out << messagesize_t(buff.size() - sizeof(messagesize_t));
 
     //Пишем буфер в сокет
@@ -211,6 +205,18 @@ void TServer::slotSendDllFileToClient()
     pSocket->flush();
 
     m_ptxt->append("Lib sends");
+}
+
+
+void TServer::slotdropAllConnections()
+{
+    if(m_tmpTcpSocket->state() != QAbstractSocket::UnconnectedState)
+        return;
+    else if(m_tmpTcpSocket->state() != QAbstractSocket::ClosingState)
+        return;
+    m_tmpTcpSocket->disconnectFromHost();
+    m_tmpTcpSocket->waitForDisconnected(3000);
+    m_ptxt->append("Connections removed");
 }
 
 

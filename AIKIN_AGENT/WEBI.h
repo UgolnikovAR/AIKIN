@@ -1,16 +1,5 @@
 #pragma once
 
-
-/* Реализация сетевого интерфейса:
- * LISTEN(ожидание)     - Блокировка, ожидание входящего соединения
- * CONNECT(соединение)  - Установка соединения с ожидающим объектом
- * ACCEPT(прием)        - Прием входящего соединения от объекта того же уровня
- * RECEIVE(прием)       - Блокировка, ожидание входящего сообщения
- * SEND(отправка)       - Отправка сообщения ожидающему объекту того же уровня
- * DISCONNECT(разрыв)   - Разрыв соединения
-*/
-
-
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -21,30 +10,27 @@
 #include <QDebug>
 
 
-
-
 /* class WEBI. Модуль. Сетевой интерфейс.
  * Ожидает приём пакета.
  * При получении, расшифровывает пакет и формирует объект ArchitectState_data.
  * Объект ArchitectState_data передается в область вызывающей процедуры (Поток-1).
  */
+using nport_t = quint32;
 //Интерфейс сетевого модуля
-class WEBI : public QThread
+class WEBI : public QObject
 {
     Q_OBJECT //для сигнально-слотового соединения
 
 public:
     explicit WEBI();
             ~WEBI();
-
-    /* WEBI::run  -  Наблюдение за сетью,
-     * вызов методов Spotter.*/
-    void run(); //thread creates
+    QTcpSocket* getpSocket();
 
 private: //Процедуры работы с сетью
+    /*Соединение с сервером по, автоматически подобранным, параметрам*/
+    void connectToServer();
     void connectToServer(QString, quint16);
     void sentToServer(QByteArray&);
-    void readLib();
 
 private slots:
     void slotSentToServer(QString);
@@ -52,13 +38,10 @@ private slots:
     void slotReadyRead();
     void pingToServer();
     void slotError(QAbstractSocket::SocketError);
-    void slotTest();
-
 
 private: //Организационные процедуры
-    //static void exec(WEBI*); olds
-    void at_work();
-    void wait(quint32 msec);
+    QString actualHostName();
+    nport_t actualPort();
 
 private:
     QTcpSocket* socket;
@@ -68,5 +51,24 @@ private:
 
 signals:
     void signalSentToServer(QString);
-    void sigTest();
+};
+
+
+class WEBI_Thread
+        : public QThread
+{
+    Q_OBJECT
+
+    WEBI* webi;
+
+public:
+    WEBI_Thread();
+    /*вызов методов Spotter.*/
+    void run();
+
+private: //Организационные процедуры
+    void at_work();
+
+signals:
+    void signalSentToServer(QString);
 };
