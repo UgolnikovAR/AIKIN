@@ -8,14 +8,30 @@
 
 #include <QHostAddress>
 
-WEBI_Thread::WEBI_Thread()
+WEBI::WEBI()
     :QThread(nullptr)
-{}
-
-
-void WEBI_Thread::run()
 {
-    webi = new WEBI;
+    socket = new QTcpSocket();
+
+    connect(socket, SIGNAL(connected()), SLOT(slotConnected()));
+    connect(socket, SIGNAL(readyRead()), SLOT(slotReadyRead()));
+
+    connect(this, SIGNAL(signalSentToServer(QString)), SLOT(slotSentToServer(QString)));
+    connectToServer("localhost", 2323);
+
+
+    connect(this, SIGNAL(sigTest()), SLOT(slotTest()), Qt::DirectConnection);
+
+
+}
+
+
+void WEBI::run()
+{
+    emit signalSentToServer(QString("Signal Call from run()"));
+    emit sigTest();
+
+    //connectToServer("localhost", 2323);
 
     using namespace std;
     cout << "WEBI in work" << endl;
@@ -24,68 +40,29 @@ void WEBI_Thread::run()
 }
 
 
-void WEBI_Thread::at_work()
+void WEBI::at_work()
 {
     using namespace std;
 
-    if(auto state = webi->getpSocket()->state(); state == QAbstractSocket::ConnectedState)
+    if(socket->state() == QAbstractSocket::ConnectedState)
         cout << "connected!" << endl;
-    else if(state == QAbstractSocket::ConnectingState)
+    else if(socket->state() == QAbstractSocket::ConnectingState)
         cout << "connecting..." << endl;
-    else if(state == QAbstractSocket::UnconnectedState)
+    else if(socket->state() == QAbstractSocket::UnconnectedState)
         cout << "unconnected" << endl;
     else
-      { cout << "socket state = " << state << endl; }
-
-    connect(this, SIGNAL(signalSentToServer(QString)), webi, SLOT(slotSentToServer(QString)));
-
+      { cout << "socket state = " << socket->state() << endl; }
     forever
     {
         emit signalSentToServer(QString("->ping<-"));
-        std::this_thread::sleep_for(std::chrono::milliseconds(3000));
-    }
-}
-
-
-WEBI::WEBI()
-    :QObject(nullptr)
-{
-    socket = new QTcpSocket();
-
-    connect(socket, SIGNAL(connected()), SLOT(slotConnected()));
-    connect(socket, SIGNAL(readyRead()), SLOT(slotReadyRead()));
-
-    connect(this, SIGNAL(signalSentToServer(QString)), SLOT(slotSentToServer(QString)));
-    connectToServer();
-
-
-    connect(this, SIGNAL(sigTest()), SLOT(slotTest()), Qt::DirectConnection);
-
-
-}
-
-QTcpSocket* WEBI::getpSocket() { return socket; }
-
-
-void WEBI::connectToServer()
-{
-    if(auto state = socket->state();
-       state == QAbstractSocket::ConnectedState) {
-        return;
-    }
-    else if(state == QAbstractSocket::ConnectingState) {
-        socket->waitForConnected(3000);
-    }
-    else if(state == QAbstractSocket::UnconnectedState) {
-        connectToServer(actualHostName(), actualPort());
-        socket->waitForConnected(30000);
+        wait(3000);
     }
 }
 
 
 void WEBI::connectToServer(QString hostName, quint16 port)
 {
-    /*Нужно предусмотреть вариант переключения с сервера на сервер*/
+
     socket->connectToHost(hostName, port);
     socket->waitForConnected(3000);
 }
@@ -98,12 +75,24 @@ void WEBI::sentToServer(QByteArray& arrBlock)
 }
 
 
+void WEBI::readLib()
+{
+
+}
+
+
 /*
  * Слот-метод для отправки данных серверу
 */
 void WEBI::slotSentToServer(QString text)
 {
-    /*формируем данные для отправки*/
+//здесь подразумевается, что сокет уже назначен
+//и соединение с сервером установлено(TCP)
+
+    if(socket == nullptr) //не назначен
+        qDebug() << "Socket was lost in \"slotSentToServer()\"";
+
+    //данные для отправки
     QByteArray arrBlock;
     QDataStream out(&arrBlock, QIODevice::WriteOnly);
     out.setVersion(QDataStream::Qt_5_2);
@@ -113,10 +102,8 @@ void WEBI::slotSentToServer(QString text)
     out.device()->seek(0);
     out << messagesize_t(arrBlock.size() - sizeof(messagesize_t));
 
-    /*проверяем подключение*/
-    connectToServer();
-
-    sentToServer(arrBlock);
+    socket->write(arrBlock);
+    socket->flush();
 }
 
 
@@ -246,17 +233,24 @@ void WEBI::slotError(QAbstractSocket::SocketError err)
 }
 
 
-QString WEBI::actualHostName()
+void WEBI::slotTest()
 {
-    /*Возврат актуального значение адреса хоста*/
-    return QString("localhost");
-}
-nport_t WEBI::actualPort()
-{
-    /*Возврат актуального значение порта хоста*/
-    return nport_t(2323);
+    std::cout << "slot test is ok" << std::endl;
 }
 
+
+/*WEBI wait - это костыль,
+ * который реализует блокировку Qt-потока внутри самого потока. Для метода at_work.
+ * Пока что я хз, как сделать по-другому. Позже надо будет убрать.*/
+void WEBI::wait(quint32 time)
+{
+    std::thread timer([&time]
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(time));
+    });
+
+    timer.join();
+}
 
 
 WEBI::~WEBI()
