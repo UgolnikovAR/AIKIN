@@ -45,15 +45,8 @@ public:
 private: //Процедуры работы с сетью
     void connectToServer(QString, quint16);
     void sentToServer(QByteArray&);
-    void readLib();
 
 private slots:
-    void slotSentToServer(QString);
-    void slotConnected();
-    void slotReadyRead();
-    void pingToServer();
-    void slotError(QAbstractSocket::SocketError);
-    void slotTest();
 
 
 private: //Организационные процедуры
@@ -88,6 +81,7 @@ public:
     virtual ~SocketWorker(){};
 
 public slots:
+
     void slotSentToServer(QString);
     void slotConnected();
     void slotReadyRead();
