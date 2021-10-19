@@ -20,8 +20,7 @@
 #include <QTcpSocket>
 #include <QDebug>
 
-
-
+class SocketWorker;
 
 /* class WEBI. Модуль. Сетевой интерфейс.
  * Ожидает приём пакета.
@@ -29,6 +28,8 @@
  * Объект ArchitectState_data передается в область вызывающей процедуры (Поток-1).
  */
 //Интерфейс сетевого модуля
+
+using messagesize_t = quint32;
 class WEBI : public QThread
 {
     Q_OBJECT //для сигнально-слотового соединения
@@ -61,12 +62,39 @@ private: //Организационные процедуры
     void wait(quint32 msec);
 
 private:
-    QTcpSocket* socket;
+    SocketWorker* _sworker;
+    QThread* _sw_thread;
+    QTcpSocket* _socket;
 
-    using messagesize_t = quint32;
-    messagesize_t     m_nNextBlockSize = 0;
+
+    messagesize_t     _nNextBlockSize = 0;
 
 signals:
     void signalSentToServer(QString);
     void sigTest();
+};
+
+
+/*Класс обработки сигналов сокета WEBI*/
+class SocketWorker
+        : public QObject
+{
+    Q_OBJECT
+    QTcpSocket* _socket;
+
+public:
+    SocketWorker(QTcpSocket*s)
+        : _socket(s){}
+    virtual ~SocketWorker(){};
+
+public slots:
+    void slotSentToServer(QString);
+    void slotConnected();
+    void slotReadyRead();
+    void slotDisconnected();
+    void pingToServer();
+
+
+private:
+    messagesize_t _nNextBlockSize = 0;
 };
