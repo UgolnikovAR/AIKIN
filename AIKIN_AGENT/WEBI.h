@@ -20,6 +20,9 @@
 #include <QTcpSocket>
 #include <QDebug>
 
+#include "Spotter.h"
+#include "../AIKIN_SERVER/MessageTypes.h"
+
 class SocketWorker;
 
 /* class WEBI. Модуль. Сетевой интерфейс.
@@ -35,7 +38,7 @@ class WEBI : public QThread
     Q_OBJECT //для сигнально-слотового соединения
 
 public:
-    explicit WEBI();
+    explicit WEBI(Spotter*);
             ~WEBI();
 
     /* WEBI::run  -  Наблюдение за сетью,
@@ -47,7 +50,7 @@ private: //Процедуры работы с сетью
     void sentToServer(QByteArray&);
 
 private slots:
-
+    /*.. ..*/
 
 private: //Организационные процедуры
     //static void exec(WEBI*); olds
@@ -61,6 +64,7 @@ private:
 
 
     messagesize_t     _nNextBlockSize = 0;
+    Spotter* sma_pspotter;
 
 signals:
     void signalSentToServer(QString);
@@ -76,12 +80,12 @@ class SocketWorker
     QTcpSocket* _socket;
 
 public:
-    SocketWorker(QTcpSocket*s)
-        : _socket(s){}
+    SocketWorker(QTcpSocket*sock, Spotter* spot)
+        : _socket(sock)
+        , sma_pspotter(spot){}
     virtual ~SocketWorker(){};
 
 public slots:
-
     void slotSentToServer(QString);
     void slotConnected();
     void slotReadyRead();
@@ -91,4 +95,8 @@ public slots:
 
 private:
     messagesize_t _nNextBlockSize = 0;
+    Spotter* sma_pspotter;
+
+signals:
+    void registerDll(QString);
 };

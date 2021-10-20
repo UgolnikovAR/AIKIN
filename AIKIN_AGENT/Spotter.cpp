@@ -12,7 +12,18 @@ Procedure Spotter::form_procedure()
 }
 
 
-void Spotter::slotRegDll(QString)
+QString Spotter::newDllName()
 {
-    /*формирование и добавление библиотеки в вектор*/
+    /* Здесь подразумевается реализация механизма
+     * генерации уникальных имен для библиотек.*/
+    return QString("ReceivedLib.dll");
+}
+
+
+void Spotter::slotRegDll(QString libname)
+{
+    /*Добавление названия библиотеки в вектор*/
+    qDebug() << "slotRegDll: register " << libname;
+
+    _dllRegistr.push_back(libname);
 }

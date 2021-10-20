@@ -26,5 +26,6 @@ HEADERS += \
     Procedure.h \
     WEBI.h \
     Spotter.h \
-    Processor.h
+    Processor.h \
+    ../AIKIN_SERVER/MessageTypes.h
 

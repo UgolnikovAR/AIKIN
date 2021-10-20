@@ -1,10 +1,11 @@
 #include "Agent.h"
 
 Agent::Agent()
- : //WEBI(), olds
-   Spotter(),
-   Processor()
+ :  Spotter()
+   ,Processor()
+   ,_webi((Spotter*)(this))
 {
+
     proc = Spotter::form_procedure();
 
 }
@@ -12,7 +13,7 @@ Agent::Agent()
 
 void Agent::exec()
 {
-    webi.start(QThread::NormalPriority);
+    _webi.start(QThread::NormalPriority);
 
     Processor::run();
 

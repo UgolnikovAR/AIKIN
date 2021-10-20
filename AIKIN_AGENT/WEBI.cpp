@@ -9,14 +9,16 @@
 #include <QHostAddress>
 #include <QSocketNotifier>
 
-WEBI::WEBI()
+WEBI::WEBI(Spotter* pspotter)
     :QThread(nullptr)
+    ,sma_pspotter(pspotter)
 {
     _sw_thread = new QThread;
     _socket = new QTcpSocket();
-    _sworker = new SocketWorker(_socket);
+    _sworker = new SocketWorker(_socket, sma_pspotter);
     _sworker->moveToThread(_sw_thread);
 
+    connect(_sworker, SIGNAL(registerDll(QString)), sma_pspotter, SLOT(slotRegDll(QString)));
 
     connect(_socket, SIGNAL(connected()), _sworker, SLOT(slotConnected()), Qt::DirectConnection);
     connect(_socket, SIGNAL(readyRead()), _sworker, SLOT(slotReadyRead()), Qt::DirectConnection);
@@ -158,14 +160,13 @@ void SocketWorker::slotReadyRead()
         QByteArray buff;
 
 
-
         in >> message_t;
-        if(message_t == 1) {
+        if(message_t == String_msgt) {
             qDebug() << "got message with code (" << message_t <<")";
             in >> time >> str;
             qDebug() << time.toString() + " " + str;
         }
-        else if(message_t == 2) {
+        else if(message_t == TextFile_msgt) {
             qDebug() << "got message with code (" << message_t <<")";
             quint32 size = 0;
             in >> size;                //Передача данных в файл производится через буфер buff
@@ -178,7 +179,7 @@ void SocketWorker::slotReadyRead()
                 qDebug() << "incomes txt are empty, considering that size larger";
 
 
-            QFile newfile("test.txt");
+            QFile newfile("TEXT.txt");
             newfile.open(QIODevice::WriteOnly);
             newfile.write(buffer8t, size);
             newfile.close();
@@ -186,12 +187,12 @@ void SocketWorker::slotReadyRead()
 
             emit slotSentToServer("Got txt, thanks =)");
         }
-        else if(message_t == 3) {
+        else if(message_t == DllFile_msgt) {
             qDebug() << "DBG got message with code (" << message_t <<")";
             quint32 size = 0;
             in >> size;
 
-            //строгое чтение остатка сообщения
+            /*строгое чтение остатка сообщения*/
             char* data = nullptr;
             char buffer8t[size];
             qDebug() << "Bytes available to read in socket = " << _socket->bytesAvailable();
@@ -200,12 +201,17 @@ void SocketWorker::slotReadyRead()
             if(data != nullptr)
                 delete[] data; //освобождение памяти после QDataStream::readBytes
 
-            QFile newfile("MyReceivedLIB.dll");
+
+            QString libname = sma_pspotter->newDllName();
+
+            qDebug() << "Got lib here";
+            emit registerDll(libname);
+
+            /*Создается файл и происходит запись библиотеки*/
+            QFile newfile(libname);
             newfile.open(QIODevice::WriteOnly);
             newfile.write(buffer8t, size);
             newfile.close();
-
-            qDebug() << "Got lib here";
 
             emit slotSentToServer("Got new dll, thanks =)");
         }

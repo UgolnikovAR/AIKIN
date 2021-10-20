@@ -46,9 +46,9 @@ class Agent : //private WEBI,
               public Spotter,
               private Processor
 {
-    WEBI webi;
+    WEBI _webi;
 
-    static ArchitectureCondition condition;
+    static ArchitectureCondition _archCondition;
 
     void at_work();
 
