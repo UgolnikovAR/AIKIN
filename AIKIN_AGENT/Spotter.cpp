@@ -1,6 +1,8 @@
 #include "Spotter.h"
 #include <QLibrary>
 
+QVector<QString> Spotter::_dllRegistr{};
+
 #define procName "dllsays"
 static const QString dllName{"AIKIN_LIB"};
 
@@ -25,5 +27,5 @@ void Spotter::slotRegDll(QString libname)
     /*Добавление названия библиотеки в вектор*/
     qDebug() << "slotRegDll: register " << libname;
 
-    _dllRegistr.push_back(libname);
+    Spotter::_dllRegistr.push_back(libname);
 }

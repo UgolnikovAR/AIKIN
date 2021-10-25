@@ -13,10 +13,10 @@ WEBI::WEBI(Spotter* pspotter)
     :QThread(nullptr)
     ,sma_pspotter(pspotter)
 {
-    _sw_thread = new QThread;
+    sw_pthread = new QThread;
     _socket = new QTcpSocket();
-    _sworker = new SocketWorker(_socket, sma_pspotter);
-    _sworker->moveToThread(_sw_thread);
+    _sworker = new SocketWorker(_socket, this);
+    _sworker->moveToThread(sw_pthread);
 
     connect(_sworker, SIGNAL(registerDll(QString)), sma_pspotter, SLOT(slotRegDll(QString)));
 
@@ -34,7 +34,7 @@ WEBI::WEBI(Spotter* pspotter)
 void WEBI::run()
 {
     /*Запуск потока обработки сигналов сокета WEBI*/
-    _sw_thread->start();
+    sw_pthread->start();
 
     emit signalSentToServer(QString("Signal Call from run()"));
 
@@ -43,6 +43,9 @@ void WEBI::run()
 
     at_work();
 }
+
+
+Spotter* WEBI::spotter() {return sma_pspotter;}
 
 
 void WEBI::at_work()
@@ -65,6 +68,21 @@ void WEBI::at_work()
 }
 
 
+void WEBI::connectToServer()
+{
+    /*Здесь производится проверка состояний сокета относительно подключения.*/
+    if(_socket->state() == QAbstractSocket::ConnectedState)
+        return;
+    if(_socket->state() == QAbstractSocket::UnconnectedState)
+    {
+        connectToServer(autoHostName(), autoNPort());
+        _socket->waitForConnected(3000);
+    }
+    /*.. ..*/
+          /*Предполагается обрабатывать все состояния сокета.*/
+}
+
+
 void WEBI::connectToServer(QString hostName, quint16 port)
 {
     if(_socket->state() == QAbstractSocket::UnconnectedState) {
@@ -75,9 +93,11 @@ void WEBI::connectToServer(QString hostName, quint16 port)
 }
 
 
+/*Запись данных в сокет и отправка*/
 void WEBI::sentToServer(QByteArray& arrBlock)
 {
     _socket->write(arrBlock);
+    _socket->waitForBytesWritten(3000);
     _socket->flush();
 }
 
@@ -96,6 +116,18 @@ void WEBI::wait(quint32 time)
 }
 
 
+QString WEBI::autoHostName()
+{
+    /*Здесь предполагается автоматическое определение имени хоста-сервера*/
+    return QString("localhost");
+}
+NPort   WEBI::autoNPort()
+{
+    /*Здесь предполагается автоматическое определение номера порта хоста-сервера*/
+    return NPort(2323);
+}
+
+
 WEBI::~WEBI()
 {
     _socket->close();
@@ -104,27 +136,80 @@ WEBI::~WEBI()
 //==============================================================================
 
 
+bool SocketWorker::connectToServer()
+{
+    /*Здесь производится проверка состояний сокета относительно подключения.*/
+    if(_socket->state() == QAbstractSocket::ConnectedState)
+        return true;
+    if(_socket->state() == QAbstractSocket::UnconnectedState)
+    {
+        connectToServer(autoHostName(), autoNPort());
+        _socket->waitForConnected(5000);
+    }
+    /*.. ..*/
+          /*Предполагается обрабатывать все состояния сокета.*/
+
+    /*Если так и не получилось подключиться, тогда просто выходим.*/
+    if(_socket->state() == QAbstractSocket::ConnectedState)
+        return true;
+    else
+        return false;
+}
+
+
+void SocketWorker::connectToServer(QString hostName, quint16 port)
+{
+    if(_socket->state() == QAbstractSocket::UnconnectedState) {
+        qDebug() << "Trying to connect to " << hostName << " at port" << port;
+        _socket->connectToHost(hostName, port);
+        _socket->waitForConnected(5000);
+    }
+}
+
+
+QString SocketWorker::autoHostName()
+{
+    /*Здесь предполагается автоматическое определение имени хоста-сервера*/
+    return QString("localhost");
+}
+NPort   SocketWorker::autoNPort()
+{
+    /*Здесь предполагается автоматическое определение номера порта хоста-сервера*/
+    return NPort(2323);
+}
+
+
 void SocketWorker::slotSentToServer(QString text)
 {
-    //здесь подразумевается, что сокет уже назначен
-    //и соединение с сервером установлено(TCP)
-
         if(_socket == nullptr) //не назначен
             qDebug() << "Socket was lost in \"slotSentToServer()\"";
 
-        //данные для отправки
-        QByteArray arrBlock;
-        QDataStream out(&arrBlock, QIODevice::WriteOnly);
-        out.setVersion(QDataStream::Qt_5_2);
+        /*Попытка подключения к серверу,
+         * Если удачно - отправляем данные,
+         * Иначе пропускаем этот пинг.*/
+        if(connectToServer())
+        {
+            /*Подготовка данных к отправке*/
+            QByteArray arrBlock;
+            QDataStream out(&arrBlock, QIODevice::WriteOnly);
+            out.setVersion(QDataStream::Qt_5_2);
 
-        out << messagesize_t(0) << QTime::currentTime() << text;
+            out << messagesize_t(0) << QTime::currentTime() << text;
 
-        out.device()->seek(0);
-        out << messagesize_t(arrBlock.size() - sizeof(messagesize_t));
+            out.device()->seek(0);
+            out << messagesize_t(arrBlock.size() - sizeof(messagesize_t));
 
-        _socket->write(arrBlock);
-        _socket->flush();
+            /*Отправка данных*/
+            _socket->write(arrBlock);
+            _socket->waitForBytesWritten(3000);
+            _socket->flush();
+        }
+
+        /*Закрытие сокета*/
+        /*Здесь обязательно нужна проверка: передает ли сейчас сервер данные*/
+        //_socket->close();
 }
+
 
 void SocketWorker::slotConnected()
 {
@@ -178,7 +263,7 @@ void SocketWorker::slotReadyRead()
             if(auto res = in.readRawData(buffer8t, size); res == 0 || res == -1)
                 qDebug() << "incomes txt are empty, considering that size larger";
 
-
+            /*Подготовка файла для записи данных*/
             QFile newfile("TEXT.txt");
             newfile.open(QIODevice::WriteOnly);
             newfile.write(buffer8t, size);
@@ -202,7 +287,7 @@ void SocketWorker::slotReadyRead()
                 delete[] data; //освобождение памяти после QDataStream::readBytes
 
 
-            QString libname = sma_pspotter->newDllName();
+            QString libname = _pwebi->spotter()->newDllName();
 
             qDebug() << "Got lib here";
             emit registerDll(libname);

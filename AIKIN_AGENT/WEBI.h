@@ -33,6 +33,7 @@ class SocketWorker;
 //Интерфейс сетевого модуля
 
 using messagesize_t = quint32;
+using NPort = quint32;
 class WEBI : public QThread
 {
     Q_OBJECT //для сигнально-слотового соединения
@@ -44,10 +45,13 @@ public:
     /* WEBI::run  -  Наблюдение за сетью,
      * вызов методов Spotter.*/
     void run(); //thread creates
+    void sentToServer(QByteArray&);
+    Spotter* spotter();
 
 private: //Процедуры работы с сетью
+    /*Попытка соединения с установленным сервером по-умолчанию*/
+    void connectToServer();
     void connectToServer(QString, quint16);
-    void sentToServer(QByteArray&);
 
 private slots:
     /*.. ..*/
@@ -59,12 +63,15 @@ private: //Организационные процедуры
 
 private:
     SocketWorker* _sworker;
-    QThread* _sw_thread;
+    QThread* sw_pthread;
     QTcpSocket* _socket;
-
 
     messagesize_t     _nNextBlockSize = 0;
     Spotter* sma_pspotter;
+
+private: //вспомогательные методы
+    QString autoHostName();
+    NPort   autoNPort();
 
 signals:
     void signalSentToServer(QString);
@@ -80,10 +87,19 @@ class SocketWorker
     QTcpSocket* _socket;
 
 public:
-    SocketWorker(QTcpSocket*sock, Spotter* spot)
+    SocketWorker(QTcpSocket*sock, WEBI* pwebi)
         : _socket(sock)
-        , sma_pspotter(spot){}
+        , _pwebi(pwebi){}
     virtual ~SocketWorker(){};
+
+private: //Процедуры работы с сетью
+    /*Попытка соединения с установленным сервером по-умолчанию*/
+    bool connectToServer();
+    void connectToServer(QString, quint16);
+
+private: //вспомогательные методы
+    QString autoHostName();
+    NPort   autoNPort();
 
 public slots:
     void slotSentToServer(QString);
@@ -95,7 +111,7 @@ public slots:
 
 private:
     messagesize_t _nNextBlockSize = 0;
-    Spotter* sma_pspotter;
+    WEBI* _pwebi;
 
 signals:
     void registerDll(QString);
