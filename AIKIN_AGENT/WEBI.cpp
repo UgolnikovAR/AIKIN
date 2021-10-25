@@ -1,4 +1,7 @@
 #include "WEBI.h"
+
+#include <tuple>
+
 #include <QDebug>
 #include <QByteArray>
 #include <QDataStream>
@@ -217,7 +220,7 @@ void SocketWorker::slotConnected()
 }
 void SocketWorker::slotReadyRead()
 {
-    qDebug() << "Ready read slot in SocketWorker.";
+    //qDebug() << "Ready read slot in SocketWorker.";
     QDataStream in(_socket);
 
     in.setVersion(QDataStream::Qt_5_3);
@@ -237,68 +240,32 @@ void SocketWorker::slotReadyRead()
             break;
         }
 
-        quint16 message_t = 0;
+        messagetype_t message_t = messagetype_t(0);
 
         QTime   time;
         QString str;
 
         QByteArray buff;
 
+        /*Передача кортежа ссылок на локальные ОД в субпроцедуры*/
+        auto local_data = std::make_tuple(std::ref(message_t),
+                                          std::ref(in),
+                                          std::ref(time),
+                                          std::ref(str)
+                                          );
 
         in >> message_t;
-        if(message_t == String_msgt) {
-            qDebug() << "got message with code (" << message_t <<")";
-            in >> time >> str;
-            qDebug() << time.toString() + " " + str;
+        if(message_t == String_msgt)
+        {
+            string_msgt_proc(local_data);
         }
-        else if(message_t == TextFile_msgt) {
-            qDebug() << "got message with code (" << message_t <<")";
-            quint32 size = 0;
-            in >> size;                //Передача данных в файл производится через буфер buff
-
-            //строгое чтение остатка сообщения
-            char buffer8t[size];
-
-            //читаем предполагаемый файл по присланному размеру
-            if(auto res = in.readRawData(buffer8t, size); res == 0 || res == -1)
-                qDebug() << "incomes txt are empty, considering that size larger";
-
-            /*Подготовка файла для записи данных*/
-            QFile newfile("TEXT.txt");
-            newfile.open(QIODevice::WriteOnly);
-            newfile.write(buffer8t, size);
-            newfile.close();
-            qDebug() << "Got txt here";
-
-            emit slotSentToServer("Got txt, thanks =)");
+        else if(message_t == TextFile_msgt)
+        {
+            textFile_msgt_proc(local_data);
         }
-        else if(message_t == DllFile_msgt) {
-            qDebug() << "DBG got message with code (" << message_t <<")";
-            quint32 size = 0;
-            in >> size;
-
-            /*строгое чтение остатка сообщения*/
-            char* data = nullptr;
-            char buffer8t[size];
-            qDebug() << "Bytes available to read in socket = " << _socket->bytesAvailable();
-            in.readBytes(data, size); //создается динамический блок памяти в char* data. Позже нужно освободить.
-            memcpy(buffer8t, data, size);
-            if(data != nullptr)
-                delete[] data; //освобождение памяти после QDataStream::readBytes
-
-
-            QString libname = _pwebi->spotter()->newDllName();
-
-            qDebug() << "Got lib here";
-            emit registerDll(libname);
-
-            /*Создается файл и происходит запись библиотеки*/
-            QFile newfile(libname);
-            newfile.open(QIODevice::WriteOnly);
-            newfile.write(buffer8t, size);
-            newfile.close();
-
-            emit slotSentToServer("Got new dll, thanks =)");
+        else if(message_t == DllFile_msgt)
+        {
+            dllFile_msgt_proc(local_data);
         }
 
         _nNextBlockSize = 0;
@@ -315,4 +282,81 @@ void SocketWorker::slotDisconnected()
 void SocketWorker::pingToServer()
 {
     slotSentToServer(" <- ping from client");
+}
+
+
+void SocketWorker::string_msgt_proc(subproc_data d)
+{
+    auto& [message_t, in, time, str] = d;
+
+    qDebug() << "got message with code (" << message_t <<")";
+    in >> time >> str;
+    qDebug() << time.toString() + " " + str;
+}
+
+
+void SocketWorker::textFile_msgt_proc(subproc_data d)
+{
+    auto& [message_t, in, time, str] = d;
+    qDebug() << "DBG got message with code (" << message_t <<")";
+    quint32 size = 0;
+    in >> size;
+
+    /*строгое чтение остатка сообщения*/
+    char* data = nullptr;
+    char buffer8t[size];
+    qDebug() << "Bytes available to read in socket = " << _socket->bytesAvailable();
+    in.readBytes(data, size); //создается динамический блок памяти в char* data. Позже нужно освободить.
+    memcpy(buffer8t, data, size);
+    if(data != nullptr)
+        delete[] data; //освобождение памяти после QDataStream::readBytes
+
+
+    QString libname = _pwebi->spotter()->newDllName();
+
+    qDebug() << "Got lib here";
+    emit registerDll(libname);
+
+    /*Создается файл и происходит запись библиотеки*/
+    QFile newfile(libname);
+    newfile.open(QIODevice::WriteOnly);
+    newfile.write(buffer8t, size);
+    newfile.close();
+
+    emit slotSentToServer("Got new dll, thanks =)");
+
+
+}
+
+
+void SocketWorker::dllFile_msgt_proc(subproc_data d)
+{
+    auto& [message_t, in, time, str] = d;
+
+    qDebug() << "DBG got message with code (" << message_t <<")";
+    quint32 size = 0;
+    in >> size;
+
+    /*строгое чтение остатка сообщения*/
+    char* data = nullptr;
+    char buffer8t[size];
+    qDebug() << "Bytes available to read in socket = " << _socket->bytesAvailable();
+    in.readBytes(data, size); //создается динамический блок памяти в char* data. Позже нужно освободить.
+    memcpy(buffer8t, data, size);
+    if(data != nullptr)
+        delete[] data; //освобождение памяти после QDataStream::readBytes
+
+
+    QString libname = _pwebi->spotter()->newDllName();
+
+    qDebug() << "Got lib here";
+    emit registerDll(libname);
+
+    /*Создается файл и происходит запись библиотеки*/
+    QFile newfile(libname);
+    newfile.open(QIODevice::WriteOnly);
+    newfile.write(buffer8t, size);
+    newfile.close();
+
+    emit slotSentToServer("Got new dll, thanks =)");
 }

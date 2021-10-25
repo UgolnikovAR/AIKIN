@@ -33,6 +33,7 @@ class SocketWorker;
 //Интерфейс сетевого модуля
 
 using messagesize_t = quint32;
+using messagetype_t = quint16;
 using NPort = quint32;
 class WEBI : public QThread
 {
@@ -78,7 +79,8 @@ signals:
     void sigTest();
 };
 
-
+/*кортеж ссылок для сообщения локальных ОД вспомогательным процедурам*/
+using subproc_data = std::tuple<messagetype_t&, QDataStream&, QTime&, QString&>;
 /*Класс обработки сигналов сокета WEBI*/
 class SocketWorker
         : public QObject
@@ -107,6 +109,12 @@ public slots:
     void slotReadyRead();
     void slotDisconnected();
     void pingToServer();
+
+private: //вспомогательные процедуры для обработки слотов
+    void string_msgt_proc(subproc_data);
+    void textFile_msgt_proc(subproc_data);
+    void dllFile_msgt_proc(subproc_data);
+
 
 
 private:
