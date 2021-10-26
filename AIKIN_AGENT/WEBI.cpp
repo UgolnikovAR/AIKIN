@@ -19,9 +19,17 @@ WEBI::WEBI(Spotter* pspotter)
 {
     sw_pthread = new QThread;
     _socket = new QTcpSocket();
+
+    InThreadSocketWorker* _socketAdapter = new InThreadSocketWorker(_socket);
+    _socketAdapter->moveToThread(_socket->thread());
+
     _sworker = new SocketWorker(_socket, this);
     _sworker->moveToThread(sw_pthread);
 
+    //пересылка сигнала передачи данных сокету через адаптер
+    connect(_sworker, SIGNAL(sendData(QByteArray*)), _socketAdapter, SLOT(slotSendData(QByteArray*)));
+
+    //сигнал на регистрацию библиотеки
     connect(_sworker, SIGNAL(registerDll(QString)), sma_pspotter, SLOT(slotRegDll(QString)));
 
     connect(_socket, SIGNAL(connected()), _sworker, SLOT(slotConnected()), Qt::DirectConnection);
@@ -143,18 +151,18 @@ WEBI::~WEBI()
 bool SocketWorker::connectToServer()
 {
     /*Здесь производится проверка состояний сокета относительно подключения.*/
-    if(_socket->state() == QAbstractSocket::ConnectedState)
+    if(_psocket->state() == QAbstractSocket::ConnectedState)
         return true;
-    if(_socket->state() == QAbstractSocket::UnconnectedState)
+    if(_psocket->state() == QAbstractSocket::UnconnectedState)
     {
         connectToServer(autoHostName(), autoNPort());
-        _socket->waitForConnected(5000);
+        _psocket->waitForConnected(5000);
     }
     /*.. ..*/
           /*Предполагается обрабатывать все состояния сокета.*/
 
     /*Если так и не получилось подключиться, тогда просто выходим.*/
-    if(_socket->state() == QAbstractSocket::ConnectedState)
+    if(_psocket->state() == QAbstractSocket::ConnectedState)
         return true;
     else
         return false;
@@ -163,10 +171,10 @@ bool SocketWorker::connectToServer()
 
 void SocketWorker::connectToServer(QString hostName, quint16 port)
 {
-    if(_socket->state() == QAbstractSocket::UnconnectedState) {
+    if(_psocket->state() == QAbstractSocket::UnconnectedState) {
         tsout << "Trying to connect to " << hostName << " at port" << port;
-        _socket->connectToHost(hostName, port);
-        _socket->waitForConnected(5000);
+        _psocket->connectToHost(hostName, port);
+        _psocket->waitForConnected(5000);
     }
 }
 
@@ -185,7 +193,7 @@ NPort   SocketWorker::autoNPort()
 
 void SocketWorker::slotSentToServer(QString text)
 {
-        if(_socket == nullptr) //не назначен
+        if(_psocket == nullptr) //не назначен
             tsout << "Socket was lost in \"slotSentToServer()\"";
 
         /*Попытка подключения к серверу,
@@ -194,19 +202,21 @@ void SocketWorker::slotSentToServer(QString text)
         if(connectToServer())
         {
             /*Подготовка данных к отправке*/
-            QByteArray arrBlock;
-            QDataStream out(&arrBlock, QIODevice::WriteOnly);
+            QByteArray* arrBlock = new QByteArray;
+            QDataStream out(arrBlock, QIODevice::WriteOnly);
             out.setVersion(QDataStream::Qt_5_2);
 
             out << messagesize_t(0) << QTime::currentTime() << text;
 
             out.device()->seek(0);
-            out << messagesize_t(arrBlock.size() - sizeof(messagesize_t));
+            out << messagesize_t(arrBlock->size() - sizeof(messagesize_t));
 
             /*Отправка данных*/
-            _socket->write(arrBlock);
-            _socket->waitForBytesWritten(3000);
-            _socket->flush();
+            emit sendData(arrBlock);
+            /*
+            _psocket->write(arrBlock);
+            _psocket->waitForBytesWritten(3000);
+            _psocket->flush();*/
         }
 
         /*Закрытие сокета*/
@@ -222,7 +232,7 @@ void SocketWorker::slotConnected()
 void SocketWorker::slotReadyRead()
 {
     //tsout << "Ready read slot in SocketWorker.";
-    QDataStream in(_socket);
+    QDataStream in(_psocket);
 
     in.setVersion(QDataStream::Qt_5_3);
     for(;;)
@@ -230,14 +240,14 @@ void SocketWorker::slotReadyRead()
         if (!_nNextBlockSize)//если неизвестен размер блока
         {
             //если пришло пустое сообщение
-            if (_socket->bytesAvailable() < sizeof(messagesize_t)){
+            if (_psocket->bytesAvailable() < sizeof(messagesize_t)){
                 break;
             }
             in >> _nNextBlockSize;
         }
 
         //если сообщение пришло не полностью
-        if (_socket->bytesAvailable() < _nNextBlockSize) {
+        if (_psocket->bytesAvailable() < _nNextBlockSize) {
             break;
         }
 
@@ -306,7 +316,7 @@ void SocketWorker::textFile_msgt_proc(subproc_data d)
     /*строгое чтение остатка сообщения*/
     char* data = nullptr;
     char buffer8t[size];
-    tsout << "Bytes available to read in socket = " << _socket->bytesAvailable();
+    tsout << "Bytes available to read in socket = " << _psocket->bytesAvailable();
     in.readBytes(data, size); //создается динамический блок памяти в char* data. Позже нужно освободить.
     memcpy(buffer8t, data, size);
     if(data != nullptr)
@@ -341,7 +351,7 @@ void SocketWorker::dllFile_msgt_proc(subproc_data d)
     /*строгое чтение остатка сообщения*/
     char* data = nullptr;
     char buffer8t[size];
-    tsout << "Bytes available to read in socket = " << _socket->bytesAvailable();
+    tsout << "Bytes available to read in socket = " << _psocket->bytesAvailable();
     in.readBytes(data, size); //создается динамический блок памяти в char* data. Позже нужно освободить.
     memcpy(buffer8t, data, size);
     if(data != nullptr)
@@ -360,4 +370,17 @@ void SocketWorker::dllFile_msgt_proc(subproc_data d)
     newfile.close();
 
     emit slotSentToServer("Got new dll, thanks =)");
+}
+
+
+/*Слот принимает динамический объект, затем удаляет его*/
+void InThreadSocketWorker::slotSendData(QByteArray* data)
+{
+    if(data != nullptr) {
+        _psocket->write(*data);
+        _psocket->waitForBytesWritten(3000);
+        _psocket->flush();
+
+        delete data;
+    }
 }

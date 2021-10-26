@@ -86,11 +86,11 @@ class SocketWorker
         : public QObject
 {
     Q_OBJECT
-    QTcpSocket* _socket;
+    QTcpSocket* _psocket;
 
 public:
     SocketWorker(QTcpSocket*sock, WEBI* pwebi)
-        : _socket(sock)
+        : _psocket(sock)
         , _pwebi(pwebi){}
     virtual ~SocketWorker(){};
 
@@ -115,12 +115,29 @@ private: //вспомогательные процедуры для обрабо
     void textFile_msgt_proc(subproc_data);
     void dllFile_msgt_proc(subproc_data);
 
-
-
 private:
     messagesize_t _nNextBlockSize = 0;
     WEBI* _pwebi;
 
 signals:
     void registerDll(QString);
+    void sendData(QByteArray*);
+};
+
+/*Класс-адаптер, позволяющий обойти ограничение
+ *  на управление QSocketNotifier между потоками.
+ *  Здесь используется сигнально-слотовое соединение между потоками.*/
+class InThreadSocketWorker
+        : public QObject
+{
+    Q_OBJECT
+
+    QTcpSocket* _psocket;
+public:
+    InThreadSocketWorker(QTcpSocket* s)
+        : _psocket(s)
+    {}
+
+public slots:
+    void slotSendData(QByteArray*);
 };
