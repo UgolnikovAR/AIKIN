@@ -9,16 +9,19 @@
 class ThreadSavePrint
 {
     QDebug pqdebug;
+    static QMutex mut;
+
 public:
     ThreadSavePrint()
         : pqdebug(qDebug())
-    {}
+    {
+        QMutexLocker locker(&mut);
+    }
 
     template<typename T>
     ThreadSavePrint& operator<<(T&& a)
     {
-        static QMutex mut;
-        QMutexLocker locker(&mut);
+
         pqdebug << a;
         return *this;
         /*Здесь было бы хорошо сделать неблокирующую
