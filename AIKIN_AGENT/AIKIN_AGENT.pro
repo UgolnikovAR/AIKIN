@@ -22,6 +22,7 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
 HEADERS += \
+    AIKIN_utility.h \
     Agent.h \
     Procedure.h \
     WEBI.h \

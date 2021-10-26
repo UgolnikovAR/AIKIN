@@ -1,12 +1,13 @@
 #include "Processor.h"
 #include "Spotter.h"
+#include "AIKIN_utility.h"
 
 #include <QDebug>
 
 void Processor::exec(Processor* p)
 {
     using namespace std;
-    cout << "Processor in work" << endl;
+    tsout << "Processor in work";
 
     at_work(p);
 }
@@ -22,7 +23,7 @@ void Processor::at_work(Processor* p)
         this_thread::sleep_for(milliseconds(300*10));
         p->proc();
     }
-    cout << "Processor exit" << endl;
+    tsout << "Processor exit";
 }
 
 

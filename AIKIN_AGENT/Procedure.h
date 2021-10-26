@@ -1,5 +1,7 @@
 #pragma once
 
+#include "AIKIN_utility.h"
+
 #include <QString>
 #include <QLibrary>
 #include <QDebug>
@@ -32,7 +34,7 @@ public:
         if(pProcedure = Procedure_func(lib.resolve(funcName))) {}
         else
         { //Если в либе не найдена процедура отправляем warning
-            qDebug() << "Procedure constructor was'nt found lib's function " + QString(funcName);
+            tsout << "Procedure constructor was'nt found lib's function " + QString(funcName);
             //и ставим пустышку
             pProcedure = nullproc;
         }

@@ -1,4 +1,6 @@
 #include "Spotter.h"
+#include "AIKIN_utility.h"
+
 #include <QLibrary>
 
 QVector<QString> Spotter::_dllRegistr{};
@@ -25,7 +27,7 @@ QString Spotter::newDllName()
 void Spotter::slotRegDll(QString libname)
 {
     /*Добавление названия библиотеки в вектор*/
-    qDebug() << "slotRegDll: " << libname << " registered.";
+    tsout << "slotRegDll: " << libname << " registered.";
 
     Spotter::_dllRegistr.push_back(libname);
 }

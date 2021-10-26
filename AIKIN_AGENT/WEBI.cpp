@@ -1,4 +1,5 @@
 #include "WEBI.h"
+#include "AIKIN_utility.h"
 
 #include <tuple>
 
@@ -42,7 +43,7 @@ void WEBI::run()
     emit signalSentToServer(QString("Signal Call from run()"));
 
     using namespace std;
-    cout << "WEBI in work" << endl;
+    tsout << "WEBI in work";
 
     at_work();
 }
@@ -56,13 +57,13 @@ void WEBI::at_work()
     using namespace std;
 
     if(_socket->state() == QAbstractSocket::ConnectedState)
-        cout << "connected!" << endl;
+        tsout << "connected!";
     else if(_socket->state() == QAbstractSocket::ConnectingState)
-        cout << "connecting..." << endl;
+        tsout << "connecting...";
     else if(_socket->state() == QAbstractSocket::UnconnectedState)
-        cout << "unconnected" << endl;
+        tsout << "unconnected";
     else
-      { cout << "socket state = " << _socket->state() << endl; }
+      { tsout << "socket state = " << _socket->state(); }
     forever
     {
         emit signalSentToServer(QString("->ping<-"));
@@ -89,7 +90,7 @@ void WEBI::connectToServer()
 void WEBI::connectToServer(QString hostName, quint16 port)
 {
     if(_socket->state() == QAbstractSocket::UnconnectedState) {
-        qDebug() << "Trying to connect to " << hostName << " at port" << port;
+        tsout << "Trying to connect to " << hostName << " at port" << port;
         _socket->connectToHost(hostName, port);
         _socket->waitForConnected(3000);
     }
@@ -163,7 +164,7 @@ bool SocketWorker::connectToServer()
 void SocketWorker::connectToServer(QString hostName, quint16 port)
 {
     if(_socket->state() == QAbstractSocket::UnconnectedState) {
-        qDebug() << "Trying to connect to " << hostName << " at port" << port;
+        tsout << "Trying to connect to " << hostName << " at port" << port;
         _socket->connectToHost(hostName, port);
         _socket->waitForConnected(5000);
     }
@@ -185,7 +186,7 @@ NPort   SocketWorker::autoNPort()
 void SocketWorker::slotSentToServer(QString text)
 {
         if(_socket == nullptr) //не назначен
-            qDebug() << "Socket was lost in \"slotSentToServer()\"";
+            tsout << "Socket was lost in \"slotSentToServer()\"";
 
         /*Попытка подключения к серверу,
          * Если удачно - отправляем данные,
@@ -216,11 +217,11 @@ void SocketWorker::slotSentToServer(QString text)
 
 void SocketWorker::slotConnected()
 {
-    qDebug() << "Received the connected() signal.";
+    tsout << "Received the connected() signal.";
 }
 void SocketWorker::slotReadyRead()
 {
-    //qDebug() << "Ready read slot in SocketWorker.";
+    //tsout << "Ready read slot in SocketWorker.";
     QDataStream in(_socket);
 
     in.setVersion(QDataStream::Qt_5_3);
@@ -275,7 +276,7 @@ void SocketWorker::slotReadyRead()
 
 void SocketWorker::slotDisconnected()
 {
-    qDebug() << "..disconnected";
+    tsout << "..disconnected";
 }
 
 
@@ -289,23 +290,23 @@ void SocketWorker::string_msgt_proc(subproc_data d)
 {
     auto& [message_t, in, time, str] = d;
 
-    qDebug() << "got message with code (" << message_t <<")";
+    tsout << "got message with code (" << message_t <<")";
     in >> time >> str;
-    qDebug() << time.toString() + " " + str;
+    tsout << time.toString() + " " + str;
 }
 
 
 void SocketWorker::textFile_msgt_proc(subproc_data d)
 {
     auto& [message_t, in, time, str] = d;
-    qDebug() << "DBG got message with code (" << message_t <<")";
+    tsout << "DBG got message with code (" << message_t <<")";
     quint32 size = 0;
     in >> size;
 
     /*строгое чтение остатка сообщения*/
     char* data = nullptr;
     char buffer8t[size];
-    qDebug() << "Bytes available to read in socket = " << _socket->bytesAvailable();
+    tsout << "Bytes available to read in socket = " << _socket->bytesAvailable();
     in.readBytes(data, size); //создается динамический блок памяти в char* data. Позже нужно освободить.
     memcpy(buffer8t, data, size);
     if(data != nullptr)
@@ -314,7 +315,7 @@ void SocketWorker::textFile_msgt_proc(subproc_data d)
 
     QString libname = _pwebi->spotter()->newDllName();
 
-    qDebug() << "Got lib here";
+    tsout << "Got lib here";
     emit registerDll(libname);
 
     /*Создается файл и происходит запись библиотеки*/
@@ -333,14 +334,14 @@ void SocketWorker::dllFile_msgt_proc(subproc_data d)
 {
     auto& [message_t, in, time, str] = d;
 
-    qDebug() << "DBG got message with code (" << message_t <<")";
+    tsout << "DBG got message with code (" << message_t <<")";
     quint32 size = 0;
     in >> size;
 
     /*строгое чтение остатка сообщения*/
     char* data = nullptr;
     char buffer8t[size];
-    qDebug() << "Bytes available to read in socket = " << _socket->bytesAvailable();
+    tsout << "Bytes available to read in socket = " << _socket->bytesAvailable();
     in.readBytes(data, size); //создается динамический блок памяти в char* data. Позже нужно освободить.
     memcpy(buffer8t, data, size);
     if(data != nullptr)
@@ -349,7 +350,7 @@ void SocketWorker::dllFile_msgt_proc(subproc_data d)
 
     QString libname = _pwebi->spotter()->newDllName();
 
-    qDebug() << "Got lib here";
+    tsout << "Got lib here";
     emit registerDll(libname);
 
     /*Создается файл и происходит запись библиотеки*/
